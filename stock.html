@@ -384,7 +384,7 @@
         </div>
         <span class="price-badge badge-flat" id="sBadge">-</span>
       </div>
-      <div class="price-note">* Yahoo Finance 제공 · 최대 15~20분 지연 가능</div>
+      <div class="price-note" id="priceNote">* Yahoo Finance 제공 · 최대 15~20분 지연 가능</div>
     </div>
 
     <!-- Core metrics -->
@@ -503,16 +503,14 @@
 </div><!-- /wrap -->
 
 <script>
-  /* ────────────────────────────────────────────────
+  /* ═══════════════════════════════════════════════
      Utilities
-  ──────────────────────────────────────────────── */
+  ═══════════════════════════════════════════════ */
   const $ = id => document.getElementById(id);
 
-  function num(n, dp = 2, sep = true) {
+  function num(n, dp = 2) {
     if (n == null || isNaN(n)) return null;
-    return sep
-      ? n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp })
-      : n.toFixed(dp);
+    return n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
   }
 
   function cap(n) {
@@ -533,9 +531,7 @@
 
   function priceFmt(n, isKRW) {
     if (n == null) return 'N/A';
-    return isKRW
-      ? Math.round(n).toLocaleString('ko-KR')
-      : num(n, 2);
+    return isKRW ? Math.round(n).toLocaleString('ko-KR') : num(n, 2);
   }
 
   function setText(id, val, fallback = 'N/A') {
@@ -573,6 +569,7 @@
   }
 
   function divTag(y) {
+    // y 는 fraction (0.0053 = 0.53%)
     if (y == null || y === 0) return ['⚪ 무배당', 'tag-n'];
     const p = y * 100;
     if (p < 1)  return ['⚪ 소액 배당', 'tag-n'];
@@ -587,17 +584,87 @@
     return v > 0 ? ['🟢 흑자 기업', 'tag-g'] : ['🔴 적자 기업', 'tag-r'];
   }
 
-  /* ────────────────────────────────────────────────
-     Fetch & Render
-  ──────────────────────────────────────────────── */
-  function quick(sym) {
-    $('sym').value = sym;
-    doSearch();
+  /* ═══════════════════════════════════════════════
+     API — Yahoo Finance v7/finance/quote
+     v10/quoteSummary 는 2024년부터 인증(crumb) 필요.
+     v7/quote 는 인증 없이 동작하며 필요한 모든 필드를
+     단일 호출로 반환한다.
+  ═══════════════════════════════════════════════ */
+  const FIELDS = [
+    'regularMarketPrice', 'regularMarketChange', 'regularMarketChangePercent',
+    'regularMarketVolume', 'regularMarketDayHigh', 'regularMarketDayLow',
+    'regularMarketPreviousClose', 'marketCap', 'currency',
+    'longName', 'shortName', 'fullExchangeName',
+    'trailingPE', 'priceToBook',
+    'trailingAnnualDividendYield', 'trailingAnnualDividendRate',
+    'fiftyTwoWeekLow', 'fiftyTwoWeekHigh',
+    'fiftyDayAverage', 'twoHundredDayAverage',
+    'epsTrailingTwelveMonths', 'beta'
+  ].join(',');
+
+  function buildUrl(host, sym) {
+    return `https://${host}/v7/finance/quote?symbols=${encodeURIComponent(sym)}&fields=${FIELDS}&lang=en-US&region=US&corsDomain=finance.yahoo.com`;
   }
 
-  $('sym').addEventListener('keydown', e => {
-    if (e.key === 'Enter') doSearch();
-  });
+  /* 단일 URL 시도: 성공 시 quote 객체, 실패 시 null */
+  async function tryOne(url, ms) {
+    const ac = new AbortController();
+    const t  = setTimeout(() => ac.abort(), ms);
+    try {
+      const res = await fetch(url, { signal: ac.signal });
+      clearTimeout(t);
+      if (!res.ok) return null;
+      const text = await res.text();
+      if (!text || text.trimStart()[0] !== '{') return null;
+      const json = JSON.parse(text);
+      const q = json?.quoteResponse?.result?.[0];
+      return (q && q.regularMarketPrice != null) ? q : null;
+    } catch {
+      clearTimeout(t);
+      return null;
+    }
+  }
+
+  async function fetchStock(sym) {
+    const q1 = buildUrl('query1.finance.yahoo.com', sym);
+    const q2 = buildUrl('query2.finance.yahoo.com', sym);
+
+    /* 1단계: 직접 연결 (CORS가 허용된 환경이면 가장 빠름) */
+    const direct = await tryOne(q1, 5000);
+    if (direct) return { q: direct, via: '직접 연결' };
+
+    /* 2단계: 여러 프록시를 병렬로 시도, 가장 먼저 성공한 응답 사용
+       - corsproxy.io  : 무료, 안정적, 제한 없음
+       - allorigins.win: 무료 (간혹 불안정)
+       - query2 호스트 교차 시도                              */
+    const proxyAttempts = [
+      tryOne(`https://corsproxy.io/?${encodeURIComponent(q1)}`,  12000),
+      tryOne(`https://corsproxy.io/?${encodeURIComponent(q2)}`,  12000),
+      tryOne(`https://api.allorigins.win/raw?url=${encodeURIComponent(q1)}`, 14000),
+      tryOne(`https://api.allorigins.win/raw?url=${encodeURIComponent(q2)}`, 14000),
+    ];
+
+    /* Promise.any: 하나라도 성공하면 반환 */
+    const raceResult = await Promise.any(
+      proxyAttempts.map((p, i) =>
+        p.then(r => {
+          if (!r) throw new Error('no data');
+          const labels = ['corsproxy(q1)', 'corsproxy(q2)', 'allorigins(q1)', 'allorigins(q2)'];
+          return { q: r, via: labels[i] };
+        })
+      )
+    ).catch(() => null);
+
+    if (raceResult) return raceResult;
+
+    throw new Error('NOT_FOUND');
+  }
+
+  /* ═══════════════════════════════════════════════
+     Search handler
+  ═══════════════════════════════════════════════ */
+  function quick(sym) { $('sym').value = sym; doSearch(); }
+  $('sym').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 
   async function doSearch() {
     const raw = $('sym').value.trim().toUpperCase();
@@ -607,153 +674,122 @@
     $('errBox').style.display  = 'none';
     $('results').classList.remove('show');
     $('searchBtn').disabled = true;
+    $('loading').querySelector('p').textContent = '데이터를 불러오는 중... (최대 15초)';
 
     try {
-      const apiUrl = [
-        'https://query1.finance.yahoo.com/v10/finance/quoteSummary/',
-        raw,
-        '?modules=summaryDetail%2Cprice%2CdefaultKeyStatistics'
-      ].join('');
-
-      const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(apiUrl);
-
-      const res = await fetch(proxy, {
-        signal: AbortSignal.timeout ? AbortSignal.timeout(14000) : undefined
-      });
-
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-
-      const json = await res.json();
-      const qsr  = json?.quoteSummary;
-
-      if (qsr?.error || !qsr?.result?.[0]) {
-        const errDetail = qsr?.error?.description || '종목 코드를 찾을 수 없습니다.';
-        throw new Error(
-          errDetail + '\n\n' +
-          '올바른 종목 코드를 확인해 주세요.\n' +
-          '미국: AAPL, TSLA, MSFT\n' +
-          '한국(코스피): 005930.KS\n' +
-          '한국(코스닥): 035420.KQ'
-        );
-      }
-
-      render(qsr.result[0]);
-
+      const { q, via } = await fetchStock(raw);
+      render(q, via);
     } catch (e) {
       $('errBox').style.display = 'block';
-      $('errMsg').textContent = e.message.includes('종목') || e.message.includes('HTTP') || e.message.includes('\n')
-        ? e.message
-        : '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.\n인터넷 연결 상태를 확인하거나, 다시 검색해 주세요.';
+      $('errMsg').textContent =
+        '종목 데이터를 불러오지 못했습니다.\n\n' +
+        '✔ 종목 코드를 다시 확인해 주세요.\n' +
+        '  미국: AAPL · TSLA · MSFT · NVDA\n' +
+        '  한국(코스피): 005930.KS · 035420.KS\n' +
+        '  한국(코스닥): 068270.KQ\n\n' +
+        '✔ 네트워크 상태가 좋지 않으면 잠시 후 다시 시도해 주세요.';
     } finally {
       $('loading').style.display = 'none';
       $('searchBtn').disabled = false;
     }
   }
 
-  function render(data) {
-    const P  = data.price             || {};
-    const S  = data.summaryDetail     || {};
-    const K  = data.defaultKeyStatistics || {};
+  /* ═══════════════════════════════════════════════
+     Render  — v7 응답은 중첩 없이 flat 구조
+     (v10의 field.raw 방식과 다름)
+  ═══════════════════════════════════════════════ */
+  function render(q, via) {
+    const currency = q.currency || '';
+    const isKRW    = currency === 'KRW';
 
-    const cur     = P.currency    || '';
-    const isKRW   = cur === 'KRW';
-    const name    = P.longName    || P.shortName || P.symbol || '-';
-    const symbol  = P.symbol      || '-';
-    const exch    = P.exchangeName || P.fullExchangeName || '-';
+    /* ── 헤더 ── */
+    setText('sName',   q.longName || q.shortName || q.symbol || '-');
+    setText('sSymbol', q.symbol   || '-');
+    setText('sExch',   q.fullExchangeName || '-');
+    setText('sCur',    currency ? currency + ' ' : '');
+    setText('sPrice',  priceFmt(q.regularMarketPrice, isKRW));
 
-    // Header
-    setText('sName',   name);
-    setText('sSymbol', symbol);
-    setText('sExch',   exch);
-    setText('sCur',    cur ? cur + ' ' : '');
-
-    const price    = P.regularMarketPrice?.raw;
-    const change   = P.regularMarketChange?.raw;
-    const changePct= P.regularMarketChangePercent?.raw;
-
-    setText('sPrice', priceFmt(price, isKRW));
-
+    /* 등락 배지
+       v7의 regularMarketChangePercent 는 이미 %값 (0.64 = 0.64%)
+       v10의 raw 값과 달리 ×100 불필요                              */
+    const change    = q.regularMarketChange;
+    const changePct = q.regularMarketChangePercent;
     if (change != null && changePct != null) {
-      const up  = change > 0;
-      const eq  = change === 0;
-      const arr = up ? '▲' : (eq ? '━' : '▼');
-      const cls = up ? 'badge-up' : (eq ? 'badge-flat' : 'badge-down');
-      const sign= change > 0 ? '+' : '';
-      const chStr = isKRW ? Math.round(change).toLocaleString('ko-KR') : num(change);
-      const pctStr= ((changePct >= 0 ? '+' : '') + (changePct * 100).toFixed(2) + '%');
-      const badge = $('sBadge');
+      const up   = change > 0;
+      const eq   = change === 0;
+      const arr  = up ? '▲' : eq ? '━' : '▼';
+      const cls  = up ? 'badge-up' : eq ? 'badge-flat' : 'badge-down';
+      const sign = change > 0 ? '+' : '';
+      const chStr  = isKRW
+        ? Math.round(change).toLocaleString('ko-KR')
+        : num(Math.abs(change), 2);
+      const pctStr = (changePct >= 0 ? '+' : '') + changePct.toFixed(2) + '%';
+      const badge  = $('sBadge');
       badge.textContent = `${arr} ${sign}${chStr} (${pctStr})`;
       badge.className   = 'price-badge ' + cls;
     }
 
-    // PER
-    const per = S.trailingPE?.raw;
+    /* ── 데이터 출처 표시 ── */
+    $('priceNote').textContent =
+      `Yahoo Finance v7 · ${via} 경유 · 최대 15~20분 지연 가능`;
+
+    /* ── PER ── */
+    const per = q.trailingPE;
     setText('vPER', per != null ? num(per, 1) + 'x' : 'N/A');
     const [perTxt, perCls] = perTag(per);
     setTag('tPER', perTxt, perCls);
 
-    // PBR
-    const pbr = K.priceToBook?.raw;
+    /* ── PBR ── */
+    const pbr = q.priceToBook;
     setText('vPBR', pbr != null ? num(pbr, 2) + 'x' : 'N/A');
     const [pbrTxt, pbrCls] = pbrTag(pbr);
     setTag('tPBR', pbrTxt, pbrCls);
 
-    // Dividend yield
-    const dy = S.dividendYield?.raw;
-    setText('vDiv', (dy != null && dy > 0) ? (dy * 100).toFixed(2) + '%' : '무배당');
+    /* ── 배당수익률
+       trailingAnnualDividendYield 은 fraction (0.0053 = 0.53%) ── */
+    const dy = q.trailingAnnualDividendYield;
+    setText('vDiv', dy != null && dy > 0 ? (dy * 100).toFixed(2) + '%' : '무배당');
     const [divTxt, divCls] = divTag(dy);
     setTag('tDiv', divTxt, divCls);
 
-    // EPS
-    const eps = K.trailingEps?.raw;
-    setText('vEPS', eps != null ? (cur ? cur + ' ' : '') + num(eps, 2) : 'N/A');
+    /* ── EPS ── */
+    const eps = q.epsTrailingTwelveMonths;
+    setText('vEPS', eps != null
+      ? (currency ? currency + ' ' : '') + num(eps, 2)
+      : 'N/A');
     const [epsTxt, epsCls] = epsTag(eps);
     setTag('tEPS', epsTxt, epsCls);
 
-    // 52-week range
-    const lo  = S.fiftyTwoWeekLow?.raw;
-    const hi  = S.fiftyTwoWeekHigh?.raw;
+    /* ── 52주 범위 ── */
+    const lo    = q.fiftyTwoWeekLow;
+    const hi    = q.fiftyTwoWeekHigh;
+    const price = q.regularMarketPrice;
 
     if (lo != null && hi != null && price != null && hi > lo) {
-      const pct   = ((price - lo) / (hi - lo)) * 100;
+      const pct     = ((price - lo) / (hi - lo)) * 100;
       const clamped = Math.min(Math.max(pct, 4), 96);
-
       setText('rLow',  '최저 ' + priceFmt(lo, isKRW));
       setText('rHigh', '최고 ' + priceFmt(hi, isKRW));
       setText('rCur',  priceFmt(price, isKRW));
-
-      const fromLow  = pct.toFixed(1);
       const fromHigh = (((hi - price) / hi) * 100).toFixed(1);
-      setText('rPct', `최저가 대비 +${fromLow}% · 최고가 대비 -${fromHigh}% 위치`);
-
-      setTimeout(() => {
-        $('rangeDot').style.left = clamped + '%';
-      }, 100);
+      setText('rPct', `최저가 대비 +${pct.toFixed(1)}% · 최고가 대비 -${fromHigh}% 위치`);
+      setTimeout(() => { $('rangeDot').style.left = clamped + '%'; }, 120);
     } else {
       setText('rLow', '-'); setText('rHigh', '-');
       setText('rCur', '-'); setText('rPct', '가격 범위 데이터 없음');
     }
 
-    // Extra
-    const mktCap = P.marketCap?.raw;
-    const beta   = S.beta?.raw;
-    const volume = P.regularMarketVolume?.raw;
-    const avg50  = S.fiftyDayAverage?.raw;
-    const avg200 = S.twoHundredDayAverage?.raw;
-    const divRate= S.dividendRate?.raw;
-
-    setText('eCap',  mktCap != null ? cap(mktCap) : 'N/A');
-    setText('eBeta', beta   != null ? num(beta, 2) : 'N/A');
-    setText('eVol',  volume != null ? vol(volume)  : 'N/A');
-    setText('e50',   avg50  != null ? priceFmt(avg50, isKRW)  : 'N/A');
-    setText('e200',  avg200 != null ? priceFmt(avg200, isKRW) : 'N/A');
-    setText('eDiv',  (divRate != null && divRate > 0)
-      ? (cur ? cur + ' ' : '') + num(divRate, 2)
+    /* ── 추가 정보 ── */
+    setText('eCap',  cap(q.marketCap));
+    setText('eBeta', q.beta != null ? num(q.beta, 2) : 'N/A');
+    setText('eVol',  vol(q.regularMarketVolume));
+    setText('e50',   priceFmt(q.fiftyDayAverage, isKRW));
+    setText('e200',  priceFmt(q.twoHundredDayAverage, isKRW));
+    setText('eDiv',  q.trailingAnnualDividendRate > 0
+      ? (currency ? currency + ' ' : '') + num(q.trailingAnnualDividendRate, 2)
       : '없음');
 
     $('results').classList.add('show');
-
-    // Scroll into view on mobile
     if (window.innerWidth <= 640) {
       setTimeout(() => $('results').scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
     }
