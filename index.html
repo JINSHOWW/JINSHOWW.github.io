@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>연차 계산기</title>
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4338ca;
+      --secondary: #8b5cf6;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #0f172a;
+      --text-light: #475569;
+      --text-muted: #94a3b8;
+      --border: #e2e8f0;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      color: var(--text);
+    }
+
+    .wrapper {
+      max-width: 580px;
+      margin: 0 auto;
+      padding: 24px 16px 60px;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      padding: 32px 0 28px;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 20px;
+      font-size: 30px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 28px rgba(99,102,241,0.35);
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.03em;
+    }
+
+    .header p {
+      margin-top: 6px;
+      color: var(--text-muted);
+      font-size: 0.88rem;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 22px 24px;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.06);
+    }
+
+    .card-label {
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 16px;
+    }
+
+    /* ── Form ── */
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .form-group { display: flex; flex-direction: column; gap: 7px; }
+    .form-group.full { grid-column: span 2; }
+
+    label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-light);
+    }
+
+    input[type="date"],
+    input[type="number"] {
+      padding: 12px 14px;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: var(--bg);
+      outline: none;
+      transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+      width: 100%;
+    }
+
+    input[type="date"]:focus,
+    input[type="number"]:focus {
+      border-color: var(--primary);
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(99,102,241,0.12);
+    }
+
+    input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
+
+    /* ── Tenure badge ── */
+    .tenure-row {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+
+    .tenure-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: linear-gradient(135deg, #eef2ff, #ede9fe);
+      color: var(--primary-dark);
+      border-radius: 100px;
+      padding: 7px 18px;
+      font-size: 0.83rem;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(99,102,241,0.12);
+    }
+
+    /* ── Hero result ── */
+    .hero {
+      border-radius: 20px;
+      padding: 30px 24px 28px;
+      text-align: center;
+      color: white;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 12px;
+      transition: background 0.4s;
+    }
+
+    .hero.green  { background: linear-gradient(135deg, #059669, #10b981); }
+    .hero.orange { background: linear-gradient(135deg, #d97706, #f59e0b); }
+    .hero.red    { background: linear-gradient(135deg, #dc2626, #ef4444); }
+    .hero.indigo { background: linear-gradient(135deg, var(--primary), var(--secondary)); }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50px; right: -50px;
+      width: 180px; height: 180px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 50%;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: -70px; left: -30px;
+      width: 220px; height: 220px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 50%;
+    }
+
+    .hero-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      opacity: 0.85;
+      letter-spacing: 0.06em;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-value {
+      font-size: 5.5rem;
+      font-weight: 900;
+      line-height: 1.05;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-unit {
+      font-size: 1.6rem;
+      font-weight: 700;
+      opacity: 0.9;
+      margin-left: 2px;
+    }
+
+    .hero-note {
+      font-size: 0.8rem;
+      opacity: 0.75;
+      margin-top: 6px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Stats grid ── */
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .stat {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 18px 16px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.06);
+    }
+
+    .stat-lbl {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+
+    .stat-val {
+      font-size: 1.9rem;
+      font-weight: 900;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .stat-unit {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-left: 2px;
+    }
+
+    /* ── Progress ── */
+    .prog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .prog-title { font-size: 0.8rem; font-weight: 700; color: var(--text-light); }
+    .prog-pct   { font-size: 0.8rem; font-weight: 800; color: var(--primary); }
+
+    .prog-bar {
+      height: 10px;
+      background: var(--bg);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+
+    .prog-fill {
+      height: 100%;
+      border-radius: 100px;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      transition: width 0.9s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* ── Renewal banner ── */
+    .renewal {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+      border: 1.5px solid #bbf7d0;
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-top: 14px;
+    }
+
+    .renewal-info { display: flex; flex-direction: column; gap: 2px; }
+    .renewal-lbl  { font-size: 0.75rem; font-weight: 700; color: #065f46; }
+    .renewal-date { font-size: 1rem; font-weight: 800; color: #047857; }
+
+    .dday {
+      background: #10b981;
+      color: white;
+      border-radius: 100px;
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    /* ── Info box ── */
+    .info-box {
+      background: #fefce8;
+      border: 1.5px solid #fde68a;
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 14px;
+    }
+
+    .info-box-title {
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: #92400e;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .info-box ul {
+      list-style: none;
+      font-size: 0.8rem;
+      color: #78350f;
+      line-height: 2;
+    }
+
+    .info-box ul li::before { content: '›  '; color: #d97706; font-weight: 700; }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    th {
+      background: var(--bg);
+      color: var(--text-muted);
+      font-weight: 700;
+      padding: 9px 12px;
+      text-align: center;
+    }
+
+    td {
+      padding: 9px 12px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-light);
+    }
+
+    tr.current-row td {
+      background: #eef2ff;
+      color: var(--primary-dark);
+      font-weight: 800;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    /* ── Hidden / Visible ── */
+    .results { display: none; }
+    .results.visible {
+      display: block;
+      animation: rise 0.4s ease;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      margin-top: 28px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      line-height: 1.8;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 420px) {
+      .hero-value  { font-size: 4.5rem; }
+      .form-row    { grid-template-columns: 1fr; }
+      .form-group.full { grid-column: span 1; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">📅</div>
+    <h1>연차 계산기</h1>
+    <p>입사일을 입력하면 남은 연차를 바로 확인할 수 있어요</p>
+  </header>
+
+  <!-- Input Card -->
+  <div class="card">
+    <div class="card-label">입사 정보</div>
+    <div class="form-row">
+      <div class="form-group full">
+        <label for="hireDate">입사일</label>
+        <input type="date" id="hireDate">
+      </div>
+      <div class="form-group full">
+        <label for="usedDays">사용한 연차 (일)</label>
+        <input type="number" id="usedDays" min="0" value="0" placeholder="0">
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+
+    <!-- Tenure badge -->
+    <div class="tenure-row">
+      <span class="tenure-badge" id="tenureBadge">📌 근속 계산 중...</span>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero indigo" id="hero">
+      <div class="hero-label">남은 연차</div>
+      <div class="hero-value" id="heroValue">0<span class="hero-unit">일</span></div>
+      <div class="hero-note" id="heroNote"></div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-lbl">올해 총 연차</div>
+        <div class="stat-val" id="totalVal">0<span class="stat-unit">일</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-lbl">사용한 연차</div>
+        <div class="stat-val" id="usedVal">0<span class="stat-unit">일</span></div>
+      </div>
+    </div>
+
+    <!-- Progress + renewal -->
+    <div class="card">
+      <div class="prog-header">
+        <span class="prog-title">연차 사용 현황</span>
+        <span class="prog-pct" id="progPct">0%</span>
+      </div>
+      <div class="prog-bar">
+        <div class="prog-fill" id="progFill" style="width:0%"></div>
+      </div>
+
+      <div class="renewal" id="renewalRow">
+        <div class="renewal-info">
+          <span class="renewal-lbl">다음 연차 갱신일</span>
+          <span class="renewal-date" id="renewalDate">-</span>
+        </div>
+        <span class="dday" id="dday">D-?</span>
+      </div>
+    </div>
+
+    <!-- Leave schedule table -->
+    <div class="card">
+      <div class="card-label">연도별 연차 일수</div>
+      <div class="table-wrap">
+        <table id="leaveTable">
+          <thead>
+            <tr>
+              <th>근속 연수</th>
+              <th>연차 일수</th>
+              <th>갱신일</th>
+            </tr>
+          </thead>
+          <tbody id="leaveTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Law info -->
+    <div class="info-box">
+      <div class="info-box-title">⚖️ 계산 기준 (근로기준법 제60조)</div>
+      <ul>
+        <li>입사 1년 미만 — 매월 개근 시 1일 (최대 11일)</li>
+        <li>1년 이상 — 기본 15일</li>
+        <li>3년 이상 — 2년마다 1일씩 추가 (최대 25일)</li>
+        <li>연차 기준일은 입사일 기준으로 계산됩니다</li>
+        <li>회사 정책에 따라 실제 일수가 달라질 수 있습니다</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    근로기준법 제60조 기준으로 계산됩니다<br>
+    실제 연차는 회사 정책에 따라 달라질 수 있습니다
+  </footer>
+</div>
+
+<script>
+  const hireDateEl = document.getElementById('hireDate');
+  const usedDaysEl = document.getElementById('usedDays');
+  const resultsEl  = document.getElementById('results');
+
+  // Set max to today
+  hireDateEl.max = new Date().toISOString().split('T')[0];
+
+  /* ── Helpers ── */
+  function completedYears(hire, ref) {
+    let y = ref.getFullYear() - hire.getFullYear();
+    const md = ref.getMonth() - hire.getMonth();
+    const dd = ref.getDate()  - hire.getDate();
+    if (md < 0 || (md === 0 && dd < 0)) y--;
+    return Math.max(y, 0);
+  }
+
+  function completedMonths(hire, ref) {
+    let m = (ref.getFullYear() - hire.getFullYear()) * 12
+            + ref.getMonth() - hire.getMonth();
+    if (ref.getDate() < hire.getDate()) m--;
+    return Math.max(m, 0);
+  }
+
+  function annualLeave(years) {
+    if (years < 1) return null; // handled separately
+    return Math.min(15 + Math.floor((years - 1) / 2), 25);
+  }
+
+  function fmtDate(d) {
+    return d.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+            .replace(/\. /g, '.').replace(/\.$/, '');
+  }
+
+  /* ── Main calculation ── */
+  function calculate() {
+    const val = hireDateEl.value;
+    if (!val) { resultsEl.classList.remove('visible'); return; }
+
+    const hire = new Date(val + 'T00:00:00');
+    const now  = new Date(); now.setHours(0, 0, 0, 0);
+
+    if (hire > now) { resultsEl.classList.remove('visible'); return; }
+
+    const usedRaw = Math.max(0, parseInt(usedDaysEl.value) || 0);
+    const cYears  = completedYears(hire, now);
+    const cMonths = completedMonths(hire, now);
+
+    const isFirstYear = cYears < 1;
+    const totalLeave  = isFirstYear ? Math.min(cMonths, 11) : annualLeave(cYears);
+    const usedActual  = Math.min(usedRaw, totalLeave);
+    const remaining   = totalLeave - usedActual;
+    const pct         = totalLeave > 0 ? Math.round((usedActual / totalLeave) * 100) : 0;
+
+    /* Tenure string */
+    const remM = cMonths % 12;
+    const tenureStr = cYears > 0
+      ? `근속 ${cYears}년 ${remM}개월차`
+      : `근속 ${cMonths}개월차 (1년 미만)`;
+
+    /* Next renewal */
+    const nextRenewal = new Date(hire);
+    nextRenewal.setFullYear(hire.getFullYear() + cYears + 1);
+    const dDays = Math.ceil((nextRenewal - now) / 86400000);
+
+    /* Hero color */
+    const hero = document.getElementById('hero');
+    hero.className = 'hero ' + (remaining === 0 ? 'red' : remaining <= 3 ? 'orange' : 'indigo');
+
+    /* Update DOM */
+    document.getElementById('tenureBadge').textContent = '📌 ' + tenureStr;
+    document.getElementById('heroValue').innerHTML =
+      remaining + '<span class="hero-unit">일</span>';
+    document.getElementById('heroNote').textContent =
+      isFirstYear
+        ? `입사 ${cMonths}개월 — 월 단위 누적 중`
+        : `${cYears}년차 기준 총 ${totalLeave}일`;
+    document.getElementById('totalVal').innerHTML =
+      totalLeave + '<span class="stat-unit">일</span>';
+    document.getElementById('usedVal').innerHTML =
+      usedActual + '<span class="stat-unit">일</span>';
+    document.getElementById('progPct').textContent = pct + '%';
+    document.getElementById('progFill').style.width = pct + '%';
+    document.getElementById('renewalDate').textContent = fmtDate(nextRenewal);
+    document.getElementById('dday').textContent =
+      dDays === 0 ? 'D-Day!' : `D-${dDays}`;
+
+    buildTable(hire, cYears);
+
+    resultsEl.classList.add('visible');
+  }
+
+  /* ── Leave schedule table ── */
+  function buildTable(hire, curYears) {
+    const tbody = document.getElementById('leaveTableBody');
+    tbody.innerHTML = '';
+
+    const rows = [];
+
+    // Year 0 (< 1 year)
+    const y0End = new Date(hire); y0End.setFullYear(hire.getFullYear() + 1);
+    rows.push({ label: '1년 미만', days: '월 1일 (최대 11일)', date: fmtDate(y0End), yr: 0 });
+
+    // Years 1 ~ max visible
+    const maxShow = Math.max(curYears + 3, 7);
+    for (let y = 1; y <= Math.min(maxShow, 20); y++) {
+      const renewal = new Date(hire); renewal.setFullYear(hire.getFullYear() + y);
+      const nextRen = new Date(hire); nextRen.setFullYear(hire.getFullYear() + y + 1);
+      const leave   = annualLeave(y);
+      rows.push({
+        label: `${y}년차`,
+        days: `${leave}일`,
+        date: fmtDate(nextRen),
+        yr: y
+      });
+    }
+
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      if (r.yr === curYears) tr.className = 'current-row';
+      tr.innerHTML = `<td>${r.label}${r.yr === curYears ? ' ★' : ''}</td><td>${r.days}</td><td>${r.date}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  hireDateEl.addEventListener('change', calculate);
+  usedDaysEl.addEventListener('input',  calculate);
+</script>
+</body>
+</html>
