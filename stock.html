@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>주식 종목 분석기</title>
+  <style>
+    :root {
+      --blue:    #2563eb;
+      --blue-dk: #1d4ed8;
+      --purple:  #7c3aed;
+      --green:   #16a34a;
+      --red:     #dc2626;
+      --amber:   #d97706;
+      --bg:      #f1f5f9;
+      --card:    #ffffff;
+      --text:    #0f172a;
+      --tl:      #475569;
+      --tm:      #94a3b8;
+      --border:  #e2e8f0;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', -apple-system,
+                   BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      color: var(--text);
+    }
+
+    /* ── Hero Banner ── */
+    .hero {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #4c1d95 100%);
+      color: #fff;
+      padding: 44px 20px 68px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before, .hero::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+    }
+    .hero::before { width: 350px; height: 350px; top: -120px; right: -100px; }
+    .hero::after  { width: 260px; height: 260px; bottom: -120px; left: -80px; }
+
+    .hero-icon { font-size: 44px; margin-bottom: 14px; display: block; }
+    .hero h1 {
+      font-size: 1.85rem; font-weight: 900;
+      letter-spacing: -0.04em; line-height: 1.2;
+      position: relative; z-index: 1;
+    }
+    .hero p {
+      margin-top: 8px; font-size: 0.85rem;
+      opacity: 0.65; position: relative; z-index: 1;
+    }
+
+    /* ── Wrapper ── */
+    .wrap {
+      max-width: 660px;
+      margin: 0 auto;
+      padding: 0 16px 72px;
+    }
+
+    /* ── Search Card ── */
+    .search-card {
+      background: var(--card);
+      border-radius: 22px;
+      padding: 22px 22px 18px;
+      margin-top: -40px;
+      position: relative;
+      z-index: 10;
+      box-shadow: 0 12px 48px rgba(37,99,235,0.18);
+      margin-bottom: 18px;
+    }
+
+    .search-row { display: flex; gap: 10px; }
+
+    .search-input {
+      flex: 1;
+      padding: 13px 16px;
+      border: 2px solid var(--border);
+      border-radius: 13px;
+      font-size: 1rem;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--bg);
+      outline: none;
+      text-transform: uppercase;
+      transition: border-color .2s, box-shadow .2s, background .2s;
+    }
+    .search-input::placeholder { text-transform: none; color: var(--tm); }
+    .search-input:focus {
+      border-color: var(--blue);
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(37,99,235,0.12);
+    }
+
+    .search-btn {
+      padding: 13px 22px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: #fff;
+      border: none; border-radius: 13px;
+      font-size: 0.95rem; font-weight: 700;
+      font-family: inherit; cursor: pointer;
+      transition: transform .15s, box-shadow .15s;
+      white-space: nowrap;
+    }
+    .search-btn:hover  { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,99,235,0.35); }
+    .search-btn:active { transform: translateY(0); }
+    .search-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+    .hints { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+    .hints-label { font-size: 0.75rem; font-weight: 700; color: var(--tm); }
+    .hint {
+      padding: 4px 12px;
+      background: #eff6ff; color: var(--blue);
+      border: 1.5px solid #dbeafe;
+      border-radius: 100px;
+      font-size: 0.75rem; font-weight: 700;
+      cursor: pointer; transition: background .15s;
+    }
+    .hint:hover { background: #dbeafe; }
+
+    .search-tip {
+      margin-top: 10px;
+      font-size: 0.74rem; color: var(--tm); line-height: 1.7;
+      border-top: 1px solid var(--border); padding-top: 10px;
+    }
+
+    /* ── Loading ── */
+    .loading {
+      display: none; text-align: center; padding: 48px 0;
+    }
+    .spinner {
+      display: inline-block; width: 44px; height: 44px;
+      border: 4px solid #dbeafe; border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading p { margin-top: 14px; color: var(--tm); font-size: 0.85rem; }
+
+    /* ── Error ── */
+    .err-box {
+      display: none;
+      background: #fef2f2; border: 1.5px solid #fecaca;
+      border-radius: 16px; padding: 18px 20px; margin-bottom: 16px;
+    }
+    .err-title { font-weight: 800; font-size: 0.9rem; color: #b91c1c; margin-bottom: 6px; }
+    .err-body  { font-size: 0.82rem; color: #dc2626; line-height: 1.75; white-space: pre-line; }
+
+    /* ── Results ── */
+    .results { display: none; }
+    .results.show { display: block; animation: rise .4s ease; }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Section title ── */
+    .sec-title {
+      font-size: 0.73rem; font-weight: 800; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--tm);
+      margin: 22px 0 10px;
+    }
+
+    /* ── Stock Header Card ── */
+    .stock-hdr {
+      background: var(--card);
+      border-radius: 20px; padding: 22px 24px;
+      box-shadow: 0 2px 20px rgba(0,0,0,.06);
+      margin-bottom: 14px;
+    }
+    .stock-top {
+      display: flex; justify-content: space-between;
+      align-items: flex-start; gap: 12px; margin-bottom: 16px;
+    }
+    .stock-name {
+      font-size: 1.25rem; font-weight: 900;
+      letter-spacing: -.025em; line-height: 1.25;
+    }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
+    .chip {
+      padding: 3px 10px; border-radius: 100px;
+      font-size: 0.73rem; font-weight: 800;
+    }
+    .chip-sym { background: #eff6ff; color: var(--blue); }
+    .chip-exch { background: #f8fafc; color: var(--tm); border: 1px solid var(--border); }
+
+    .price-wrap { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    .price-num {
+      font-size: 3rem; font-weight: 900;
+      letter-spacing: -.04em; line-height: 1;
+    }
+    .price-cur { font-size: 1rem; font-weight: 600; color: var(--tm); margin-right: 2px; }
+    .price-badge {
+      display: inline-flex; align-items: center;
+      padding: 5px 13px; border-radius: 100px;
+      font-size: 0.85rem; font-weight: 800;
+    }
+    .badge-up   { background: #dcfce7; color: #15803d; }
+    .badge-down { background: #fee2e2; color: #b91c1c; }
+    .badge-flat { background: #f1f5f9; color: var(--tm); }
+    .price-note { font-size: 0.72rem; color: var(--tm); margin-top: 7px; }
+
+    /* ── Metric Cards ── */
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+
+    .mc {
+      background: var(--card); border-radius: 18px;
+      padding: 18px 17px;
+      box-shadow: 0 2px 16px rgba(0,0,0,.055);
+      display: flex; flex-direction: column;
+    }
+    .mc-top {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .mc-label {
+      font-size: 0.72rem; font-weight: 800;
+      color: var(--tm); letter-spacing: .04em;
+    }
+    .mc-icon { font-size: 1.1rem; }
+    .mc-value {
+      font-size: 1.75rem; font-weight: 900;
+      letter-spacing: -.025em; color: var(--text);
+      margin-bottom: 8px;
+    }
+    .mc-na { color: var(--tm); font-size: 1.2rem; }
+    .mc-desc {
+      font-size: 0.74rem; color: var(--tl);
+      line-height: 1.6; flex: 1;
+    }
+    .mc-tag {
+      display: inline-block; margin-top: 10px;
+      padding: 3px 9px; border-radius: 100px;
+      font-size: 0.68rem; font-weight: 800;
+    }
+    .tag-g  { background: #dcfce7; color: #15803d; }
+    .tag-w  { background: #fef9c3; color: #92400e; }
+    .tag-n  { background: #f1f5f9; color: var(--tl); }
+    .tag-r  { background: #fee2e2; color: #b91c1c; }
+
+    /* ── 52-week Range ── */
+    .range-card {
+      background: var(--card); border-radius: 18px;
+      padding: 20px; box-shadow: 0 2px 16px rgba(0,0,0,.055);
+      margin-bottom: 14px;
+    }
+    .range-title {
+      font-size: 0.72rem; font-weight: 800;
+      color: var(--tm); letter-spacing: .04em; margin-bottom: 20px;
+    }
+    .range-bar-wrap { position: relative; margin-bottom: 12px; padding: 0 9px; }
+    .range-track {
+      height: 10px;
+      background: linear-gradient(90deg, #fee2e2 0%, #fef9c3 50%, #dcfce7 100%);
+      border-radius: 100px; position: relative;
+    }
+    .range-dot {
+      position: absolute; top: 50%; transform: translate(-50%, -50%);
+      width: 22px; height: 22px;
+      background: var(--blue);
+      border: 3px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 2px 10px rgba(37,99,235,.4);
+      transition: left .6s cubic-bezier(.34,1.56,.64,1);
+    }
+    .range-labels {
+      display: flex; justify-content: space-between; margin-top: 8px;
+    }
+    .range-lo { font-size: 0.8rem; font-weight: 700; color: var(--red); }
+    .range-hi { font-size: 0.8rem; font-weight: 700; color: var(--green); }
+    .range-mid {
+      text-align: center; font-size: 0.78rem;
+      color: var(--tl); margin-top: 10px;
+    }
+    .range-mid strong { color: var(--blue); font-weight: 900; }
+    .range-sub { text-align: center; font-size: 0.72rem; color: var(--tm); margin-top: 4px; }
+
+    /* ── Extra Grid ── */
+    .extra { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+    .ec {
+      background: var(--card); border-radius: 14px;
+      padding: 14px 12px; text-align: center;
+      box-shadow: 0 2px 16px rgba(0,0,0,.055);
+    }
+    .ec-lbl { font-size: 0.68rem; font-weight: 700; color: var(--tm); margin-bottom: 5px; letter-spacing: .03em; }
+    .ec-val { font-size: 1rem; font-weight: 900; color: var(--text); }
+
+    /* ── Info Box ── */
+    .info-box {
+      border-radius: 14px; padding: 14px 16px;
+      font-size: 0.78rem; line-height: 1.8;
+      margin-bottom: 13px;
+    }
+    .info-box.blue { background: #eff6ff; border: 1.5px solid #bfdbfe; color: #1e40af; }
+    .info-box.amber { background: #fffbeb; border: 1.5px solid #fde68a; color: #92400e; }
+
+    /* ── Disclaimer ── */
+    .disclaimer {
+      background: #f8fafc; border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px 16px;
+      font-size: 0.73rem; color: var(--tm); line-height: 1.8;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .hero h1       { font-size: 1.5rem; }
+      .metrics       { grid-template-columns: 1fr; }
+      .extra         { grid-template-columns: 1fr 1fr; }
+      .price-num     { font-size: 2.4rem; }
+      .stock-name    { font-size: 1.05rem; }
+      .search-btn    { padding: 13px 16px; font-size: 0.88rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <span class="hero-icon">📊</span>
+  <h1>주식 종목 분석기</h1>
+  <p>Yahoo Finance 실시간 데이터 · 초보자도 쉽게 이해하는 핵심 지표</p>
+</div>
+
+<div class="wrap">
+
+  <!-- Search -->
+  <div class="search-card">
+    <div class="search-row">
+      <input type="text" id="sym" class="search-input"
+             placeholder="종목 코드 입력 (예: AAPL, TSLA)"
+             maxlength="20" autocomplete="off" autocorrect="off" spellcheck="false">
+      <button id="searchBtn" class="search-btn" onclick="doSearch()">검색 🔍</button>
+    </div>
+    <div class="hints">
+      <span class="hints-label">빠른 검색:</span>
+      <span class="hint" onclick="quick('AAPL')">AAPL</span>
+      <span class="hint" onclick="quick('TSLA')">TSLA</span>
+      <span class="hint" onclick="quick('MSFT')">MSFT</span>
+      <span class="hint" onclick="quick('NVDA')">NVDA</span>
+      <span class="hint" onclick="quick('005930.KS')">삼성전자</span>
+      <span class="hint" onclick="quick('035420.KS')">NAVER</span>
+    </div>
+    <div class="search-tip">
+      🇰🇷 한국 주식은 종목코드 뒤에 <strong>.KS</strong>(코스피) 또는 <strong>.KQ</strong>(코스닥)를 붙여주세요<br>
+      예: 삼성전자 005930.KS · 카카오 035720.KS · 셀트리온 068270.KQ
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>종목 데이터를 불러오는 중...</p>
+  </div>
+
+  <!-- Error -->
+  <div class="err-box" id="errBox">
+    <div class="err-title">⚠️ 데이터를 불러오지 못했습니다</div>
+    <div class="err-body" id="errMsg"></div>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+
+    <!-- Header -->
+    <div class="stock-hdr">
+      <div class="stock-top">
+        <div class="stock-name" id="sName">-</div>
+        <div class="chips">
+          <span class="chip chip-sym"  id="sSymbol">-</span>
+          <span class="chip chip-exch" id="sExch">-</span>
+        </div>
+      </div>
+      <div class="price-wrap">
+        <div class="price-num">
+          <span class="price-cur" id="sCur"></span><span id="sPrice">-</span>
+        </div>
+        <span class="price-badge badge-flat" id="sBadge">-</span>
+      </div>
+      <div class="price-note">* Yahoo Finance 제공 · 최대 15~20분 지연 가능</div>
+    </div>
+
+    <!-- Core metrics -->
+    <div class="sec-title">핵심 투자 지표</div>
+    <div class="metrics">
+
+      <!-- PER -->
+      <div class="mc">
+        <div class="mc-top">
+          <span class="mc-label">PER (주가수익비율)</span>
+          <span class="mc-icon">💰</span>
+        </div>
+        <div class="mc-value" id="vPER">-</div>
+        <div class="mc-desc">
+          <strong>주가 ÷ 주당순이익(EPS)</strong>으로, 현재 주가가 1년 순이익의 몇 배인지 보여줘요.<br><br>
+          낮을수록 이익 대비 싸게 거래될 가능성이 있어요. 단, 업종마다 적정 PER이 달라요.
+        </div>
+        <span class="mc-tag tag-n" id="tPER"></span>
+      </div>
+
+      <!-- PBR -->
+      <div class="mc">
+        <div class="mc-top">
+          <span class="mc-label">PBR (주가순자산비율)</span>
+          <span class="mc-icon">🏦</span>
+        </div>
+        <div class="mc-value" id="vPBR">-</div>
+        <div class="mc-desc">
+          <strong>주가 ÷ 주당 순자산</strong>으로, 회사 장부가치 대비 주가를 비교해요.<br><br>
+          PBR이 1 미만이면 회사를 지금 당장 팔아도 주가보다 더 받을 수 있는 상태예요.
+        </div>
+        <span class="mc-tag tag-n" id="tPBR"></span>
+      </div>
+
+      <!-- Dividend -->
+      <div class="mc">
+        <div class="mc-top">
+          <span class="mc-label">배당수익률</span>
+          <span class="mc-icon">🎁</span>
+        </div>
+        <div class="mc-value" id="vDiv">-</div>
+        <div class="mc-desc">
+          <strong>연간 배당금 ÷ 주가 × 100</strong>으로, 은행 이자처럼 주식을 보유하면 받을 수 있는 수익이에요.<br><br>
+          배당이 없는 기업은 성장에 이익을 재투자하는 경향이 있어요.
+        </div>
+        <span class="mc-tag tag-n" id="tDiv"></span>
+      </div>
+
+      <!-- EPS -->
+      <div class="mc">
+        <div class="mc-top">
+          <span class="mc-label">EPS (주당순이익)</span>
+          <span class="mc-icon">📈</span>
+        </div>
+        <div class="mc-value" id="vEPS">-</div>
+        <div class="mc-desc">
+          <strong>순이익 ÷ 총 발행 주식수</strong>로, 주식 1주가 1년에 얼마나 벌었는지 보여줘요.<br><br>
+          EPS가 높을수록 수익성이 좋은 기업이고, 음수면 손실을 낸 상태예요.
+        </div>
+        <span class="mc-tag tag-n" id="tEPS"></span>
+      </div>
+
+    </div>
+
+    <!-- 52-week range -->
+    <div class="sec-title">52주 가격 범위 (지난 1년)</div>
+    <div class="range-card">
+      <div class="range-title">📉 52주 최저가 — 현재 위치 — 52주 최고가 📈</div>
+      <div class="range-bar-wrap">
+        <div class="range-track">
+          <div class="range-dot" id="rangeDot" style="left:50%"></div>
+        </div>
+      </div>
+      <div class="range-labels">
+        <span class="range-lo" id="rLow">-</span>
+        <span class="range-hi" id="rHigh">-</span>
+      </div>
+      <div class="range-mid">현재가 <strong id="rCur">-</strong></div>
+      <div class="range-sub" id="rPct">-</div>
+    </div>
+
+    <!-- Extra info -->
+    <div class="sec-title">추가 정보</div>
+    <div class="extra">
+      <div class="ec"><div class="ec-lbl">시가총액</div><div class="ec-val" id="eCap">-</div></div>
+      <div class="ec"><div class="ec-lbl">베타 (β)</div><div class="ec-val" id="eBeta">-</div></div>
+      <div class="ec"><div class="ec-lbl">거래량</div><div class="ec-val" id="eVol">-</div></div>
+      <div class="ec"><div class="ec-lbl">50일 평균가</div><div class="ec-val" id="e50">-</div></div>
+      <div class="ec"><div class="ec-lbl">200일 평균가</div><div class="ec-val" id="e200">-</div></div>
+      <div class="ec"><div class="ec-lbl">연간 배당금</div><div class="ec-val" id="eDiv">-</div></div>
+    </div>
+
+    <!-- Beta tip -->
+    <div class="info-box blue">
+      <strong>📌 베타(β)란?</strong>
+      주식이 시장 전체에 비해 얼마나 크게 움직이는지를 나타내는 지표예요.<br>
+      β=1.0이면 시장과 똑같이 움직이고, β&gt;1이면 시장보다 더 크게 오르내리는 변동성 높은 주식, β&lt;1이면 시장보다 안정적인 주식이에요.
+    </div>
+
+    <!-- PER/PBR context tip -->
+    <div class="info-box amber" id="sectorTip">
+      <strong>⚠️ PER · PBR 해석 시 주의</strong>
+      동일 업종 내에서 비교하는 게 중요해요.
+      IT·성장주는 PER이 높아도 성장성 때문에 투자자들이 프리미엄을 주는 경우가 많고,
+      금융·에너지주는 상대적으로 PER이 낮은 경향이 있어요.
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="disclaimer">
+      ⚠️ 이 페이지는 Yahoo Finance 데이터를 기반으로 정보를 제공하며, 투자 권유나 조언이 아닙니다.<br>
+      실제 투자 결정은 본인의 판단과 전문가 상담을 통해 신중하게 진행해 주세요.<br>
+      데이터는 실시간이 아닐 수 있으며 오류가 포함될 수 있습니다.
+    </div>
+
+  </div><!-- /results -->
+</div><!-- /wrap -->
+
+<script>
+  /* ────────────────────────────────────────────────
+     Utilities
+  ──────────────────────────────────────────────── */
+  const $ = id => document.getElementById(id);
+
+  function num(n, dp = 2, sep = true) {
+    if (n == null || isNaN(n)) return null;
+    return sep
+      ? n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp })
+      : n.toFixed(dp);
+  }
+
+  function cap(n) {
+    if (n == null) return 'N/A';
+    if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
+    if (n >= 1e9)  return (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6)  return (n / 1e6).toFixed(2) + 'M';
+    return n.toLocaleString();
+  }
+
+  function vol(n) {
+    if (n == null) return 'N/A';
+    if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return n.toLocaleString();
+  }
+
+  function priceFmt(n, isKRW) {
+    if (n == null) return 'N/A';
+    return isKRW
+      ? Math.round(n).toLocaleString('ko-KR')
+      : num(n, 2);
+  }
+
+  function setText(id, val, fallback = 'N/A') {
+    const el = $(id);
+    if (el) el.textContent = val ?? fallback;
+  }
+
+  function setTag(id, text, cls) {
+    const el = $(id);
+    if (!el) return;
+    if (!text) { el.style.display = 'none'; return; }
+    el.style.display = 'inline-block';
+    el.textContent = text;
+    el.className = 'mc-tag ' + cls;
+  }
+
+  /* ── Tag helpers ── */
+  function perTag(v) {
+    if (v == null) return ['', 'tag-n'];
+    if (v <= 0)  return ['🔴 적자 기업', 'tag-r'];
+    if (v < 10)  return ['🟢 매우 저평가 가능', 'tag-g'];
+    if (v < 20)  return ['🟢 저평가 가능', 'tag-g'];
+    if (v < 30)  return ['⚪ 적정 수준', 'tag-n'];
+    if (v < 50)  return ['🟡 다소 고평가', 'tag-w'];
+    return ['🔴 고평가 주의', 'tag-r'];
+  }
+
+  function pbrTag(v) {
+    if (v == null) return ['', 'tag-n'];
+    if (v < 1)   return ['🟢 장부가 이하', 'tag-g'];
+    if (v < 2)   return ['🟢 저평가 가능', 'tag-g'];
+    if (v < 5)   return ['⚪ 적정~보통', 'tag-n'];
+    if (v < 15)  return ['🟡 성장 프리미엄', 'tag-w'];
+    return ['🟡 고성장주 특성', 'tag-w'];
+  }
+
+  function divTag(y) {
+    if (y == null || y === 0) return ['⚪ 무배당', 'tag-n'];
+    const p = y * 100;
+    if (p < 1)  return ['⚪ 소액 배당', 'tag-n'];
+    if (p < 3)  return ['⚪ 보통 배당', 'tag-n'];
+    if (p < 6)  return ['🟢 높은 배당', 'tag-g'];
+    if (p < 10) return ['🟡 초고배당 (확인 필요)', 'tag-w'];
+    return ['🔴 배당지속성 확인', 'tag-r'];
+  }
+
+  function epsTag(v) {
+    if (v == null) return ['', 'tag-n'];
+    return v > 0 ? ['🟢 흑자 기업', 'tag-g'] : ['🔴 적자 기업', 'tag-r'];
+  }
+
+  /* ────────────────────────────────────────────────
+     Fetch & Render
+  ──────────────────────────────────────────────── */
+  function quick(sym) {
+    $('sym').value = sym;
+    doSearch();
+  }
+
+  $('sym').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doSearch();
+  });
+
+  async function doSearch() {
+    const raw = $('sym').value.trim().toUpperCase();
+    if (!raw) { $('sym').focus(); return; }
+
+    $('loading').style.display = 'block';
+    $('errBox').style.display  = 'none';
+    $('results').classList.remove('show');
+    $('searchBtn').disabled = true;
+
+    try {
+      const apiUrl = [
+        'https://query1.finance.yahoo.com/v10/finance/quoteSummary/',
+        raw,
+        '?modules=summaryDetail%2Cprice%2CdefaultKeyStatistics'
+      ].join('');
+
+      const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(apiUrl);
+
+      const res = await fetch(proxy, {
+        signal: AbortSignal.timeout ? AbortSignal.timeout(14000) : undefined
+      });
+
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+
+      const json = await res.json();
+      const qsr  = json?.quoteSummary;
+
+      if (qsr?.error || !qsr?.result?.[0]) {
+        const errDetail = qsr?.error?.description || '종목 코드를 찾을 수 없습니다.';
+        throw new Error(
+          errDetail + '\n\n' +
+          '올바른 종목 코드를 확인해 주세요.\n' +
+          '미국: AAPL, TSLA, MSFT\n' +
+          '한국(코스피): 005930.KS\n' +
+          '한국(코스닥): 035420.KQ'
+        );
+      }
+
+      render(qsr.result[0]);
+
+    } catch (e) {
+      $('errBox').style.display = 'block';
+      $('errMsg').textContent = e.message.includes('종목') || e.message.includes('HTTP') || e.message.includes('\n')
+        ? e.message
+        : '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.\n인터넷 연결 상태를 확인하거나, 다시 검색해 주세요.';
+    } finally {
+      $('loading').style.display = 'none';
+      $('searchBtn').disabled = false;
+    }
+  }
+
+  function render(data) {
+    const P  = data.price             || {};
+    const S  = data.summaryDetail     || {};
+    const K  = data.defaultKeyStatistics || {};
+
+    const cur     = P.currency    || '';
+    const isKRW   = cur === 'KRW';
+    const name    = P.longName    || P.shortName || P.symbol || '-';
+    const symbol  = P.symbol      || '-';
+    const exch    = P.exchangeName || P.fullExchangeName || '-';
+
+    // Header
+    setText('sName',   name);
+    setText('sSymbol', symbol);
+    setText('sExch',   exch);
+    setText('sCur',    cur ? cur + ' ' : '');
+
+    const price    = P.regularMarketPrice?.raw;
+    const change   = P.regularMarketChange?.raw;
+    const changePct= P.regularMarketChangePercent?.raw;
+
+    setText('sPrice', priceFmt(price, isKRW));
+
+    if (change != null && changePct != null) {
+      const up  = change > 0;
+      const eq  = change === 0;
+      const arr = up ? '▲' : (eq ? '━' : '▼');
+      const cls = up ? 'badge-up' : (eq ? 'badge-flat' : 'badge-down');
+      const sign= change > 0 ? '+' : '';
+      const chStr = isKRW ? Math.round(change).toLocaleString('ko-KR') : num(change);
+      const pctStr= ((changePct >= 0 ? '+' : '') + (changePct * 100).toFixed(2) + '%');
+      const badge = $('sBadge');
+      badge.textContent = `${arr} ${sign}${chStr} (${pctStr})`;
+      badge.className   = 'price-badge ' + cls;
+    }
+
+    // PER
+    const per = S.trailingPE?.raw;
+    setText('vPER', per != null ? num(per, 1) + 'x' : 'N/A');
+    const [perTxt, perCls] = perTag(per);
+    setTag('tPER', perTxt, perCls);
+
+    // PBR
+    const pbr = K.priceToBook?.raw;
+    setText('vPBR', pbr != null ? num(pbr, 2) + 'x' : 'N/A');
+    const [pbrTxt, pbrCls] = pbrTag(pbr);
+    setTag('tPBR', pbrTxt, pbrCls);
+
+    // Dividend yield
+    const dy = S.dividendYield?.raw;
+    setText('vDiv', (dy != null && dy > 0) ? (dy * 100).toFixed(2) + '%' : '무배당');
+    const [divTxt, divCls] = divTag(dy);
+    setTag('tDiv', divTxt, divCls);
+
+    // EPS
+    const eps = K.trailingEps?.raw;
+    setText('vEPS', eps != null ? (cur ? cur + ' ' : '') + num(eps, 2) : 'N/A');
+    const [epsTxt, epsCls] = epsTag(eps);
+    setTag('tEPS', epsTxt, epsCls);
+
+    // 52-week range
+    const lo  = S.fiftyTwoWeekLow?.raw;
+    const hi  = S.fiftyTwoWeekHigh?.raw;
+
+    if (lo != null && hi != null && price != null && hi > lo) {
+      const pct   = ((price - lo) / (hi - lo)) * 100;
+      const clamped = Math.min(Math.max(pct, 4), 96);
+
+      setText('rLow',  '최저 ' + priceFmt(lo, isKRW));
+      setText('rHigh', '최고 ' + priceFmt(hi, isKRW));
+      setText('rCur',  priceFmt(price, isKRW));
+
+      const fromLow  = pct.toFixed(1);
+      const fromHigh = (((hi - price) / hi) * 100).toFixed(1);
+      setText('rPct', `최저가 대비 +${fromLow}% · 최고가 대비 -${fromHigh}% 위치`);
+
+      setTimeout(() => {
+        $('rangeDot').style.left = clamped + '%';
+      }, 100);
+    } else {
+      setText('rLow', '-'); setText('rHigh', '-');
+      setText('rCur', '-'); setText('rPct', '가격 범위 데이터 없음');
+    }
+
+    // Extra
+    const mktCap = P.marketCap?.raw;
+    const beta   = S.beta?.raw;
+    const volume = P.regularMarketVolume?.raw;
+    const avg50  = S.fiftyDayAverage?.raw;
+    const avg200 = S.twoHundredDayAverage?.raw;
+    const divRate= S.dividendRate?.raw;
+
+    setText('eCap',  mktCap != null ? cap(mktCap) : 'N/A');
+    setText('eBeta', beta   != null ? num(beta, 2) : 'N/A');
+    setText('eVol',  volume != null ? vol(volume)  : 'N/A');
+    setText('e50',   avg50  != null ? priceFmt(avg50, isKRW)  : 'N/A');
+    setText('e200',  avg200 != null ? priceFmt(avg200, isKRW) : 'N/A');
+    setText('eDiv',  (divRate != null && divRate > 0)
+      ? (cur ? cur + ' ' : '') + num(divRate, 2)
+      : '없음');
+
+    $('results').classList.add('show');
+
+    // Scroll into view on mobile
+    if (window.innerWidth <= 640) {
+      setTimeout(() => $('results').scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+    }
+  }
+</script>
+</body>
+</html>
