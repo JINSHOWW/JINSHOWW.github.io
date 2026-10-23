@@ -13,5 +13,5 @@ jobs:
       - shell: bash
         run: |
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          python3 sim/portfolio.py | tee -a "$GITHUB_STEP_SUMMARY"
+          python3 sim/research.py | tee -a "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"

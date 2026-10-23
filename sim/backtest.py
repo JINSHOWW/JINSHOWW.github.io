@@ -6,18 +6,19 @@ FEE = 0.0005          # 업비트 KRW 마켓 수수료 0.05%
 CASH = 100_000
 
 
-def candles(market, days):
-    """업비트 공개 API에서 일봉을 오래된 순으로 가져온다 (200개씩)."""
+def candles(market, days, unit="days"):
+    """업비트 공개 API에서 봉을 오래된 순으로 가져온다 (200개씩). unit: days 또는 minutes/240 등.
+    days 는 가져올 봉 개수."""
     out, to = [], ""
     while len(out) < days:
-        url = f"https://api.upbit.com/v1/candles/days?market={market}&count=200" + (f"&to={to}" if to else "")
+        url = f"https://api.upbit.com/v1/candles/{unit}?market={market}&count=200" + (f"&to={to}" if to else "")
         batch = json.load(urllib.request.urlopen(url, timeout=15))
         if not batch:
             break
         out += batch
         to = batch[-1]["candle_date_time_utc"]
         time.sleep(0.15)  # 초당 요청 제한
-    return [{"t": c["candle_date_time_kst"][:10], "o": c["opening_price"], "h": c["high_price"],
+    return [{"t": c["candle_date_time_kst"][:10 if unit == "days" else 16], "o": c["opening_price"], "h": c["high_price"],
              "l": c["low_price"], "c": c["trade_price"]} for c in reversed(out[:days])]
 
 
