@@ -1,3 +1,7 @@
+## 이어하기
+
+새 세션은 `HANDOFF.md`를 먼저 읽는다 (모바일에서 하던 김프 자동매매 봇 작업과 PC 설정 순서). 모의투자 연구 결과는 `sim/LEARNINGS.md`.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
