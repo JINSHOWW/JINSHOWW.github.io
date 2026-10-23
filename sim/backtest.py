@@ -103,16 +103,20 @@ def run(d, rule, stop=None, start=0):
     return cash + coin * cl[-1], trades, mdd
 
 
-def breakout(d, k=0.5, ma_filter=False, start=0):
+def breakout(d, k=0.5, ma_filter=False, start=0, allow=None, curve=None):
     """변동성 돌파: 시가 + 전날 변동폭*k 돌파 시 매수, 다음날 시가 매도.
-    ma_filter: 시가가 5일 이동평균 위일 때만 (상승장에서만) 진입."""
+    ma_filter: 시가가 5일 이동평균 위일 때만 (상승장에서만) 진입.
+    allow: 진입을 허용할 날짜 집합 (없으면 전부). curve: 날짜별 평가금액을 담을 dict."""
     cl = [x["c"] for x in d]
     cash, trades, peak, mdd = CASH, 0, CASH, 0.0
     for i in range(max(5, start), len(d) - 1):
         target = d[i]["o"] + (d[i - 1]["h"] - d[i - 1]["l"]) * k
-        if d[i]["h"] >= target and (not ma_filter or d[i]["o"] > sma(cl, 5, i - 1)):
+        if (d[i]["h"] >= target and (not ma_filter or d[i]["o"] > sma(cl, 5, i - 1))
+                and (allow is None or d[i]["t"] in allow)):
             cash = cash * (1 - FEE) / target * d[i + 1]["o"] * (1 - FEE)
             trades += 2
+        if curve is not None:
+            curve[d[i + 1]["t"]] = cash
         peak = max(peak, cash)
         mdd = max(mdd, 1 - cash / peak)
     return cash, trades, mdd
