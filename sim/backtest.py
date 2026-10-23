@@ -85,19 +85,21 @@ def turtle(d, cl, i, held):
     return held
 
 
-def run(d, rule, stop=None, start=0):
+def run(d, rule, stop=None, start=0, lag=False):
     """held 상태를 종가에 체결. stop=0.1 이면 산 값에서 10% 빠질 때 손절.
-    start: 이 날부터 매매 (그 전 데이터는 지표 계산에만 쓰임)."""
+    start: 이 날부터 매매 (그 전 데이터는 지표 계산에만 쓰임).
+    lag: 신호 본 뒤 다음 봉 시가에 체결 (실제 주문처럼)."""
     cl = [x["c"] for x in d]
     cash, coin, entry, trades, peak, mdd = CASH, 0.0, 0.0, 0, CASH, 0.0
     for i in range(start, len(d)):
         want = rule(d, cl, i, coin > 0)
         if stop and coin > 0 and cl[i] < entry * (1 - stop):
             want = False
+        px = d[i + 1]["o"] if lag and i + 1 < len(d) else cl[i]
         if want and coin == 0:
-            coin, cash, entry, trades = cash * (1 - FEE) / cl[i], 0, cl[i], trades + 1
+            coin, cash, entry, trades = cash * (1 - FEE) / px, 0, px, trades + 1
         elif not want and coin > 0:
-            cash, coin, trades = coin * cl[i] * (1 - FEE), 0, trades + 1
+            cash, coin, trades = coin * px * (1 - FEE), 0, trades + 1
         value = cash + coin * cl[i]
         peak = max(peak, value)
         mdd = max(mdd, 1 - value / peak)
