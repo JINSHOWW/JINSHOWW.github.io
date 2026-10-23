@@ -1,2 +1,11 @@
 graphify-out/
 __pycache__/
+# 영상 프로젝트: 비밀값과 대용량 생성물
+.env
+.env.*
+!.env.example
+stories/*/audio/*.wav
+stories/*/output/*.mp4
+stories/*/output/qc/
+stories/*/.work/
+pipeline/.cache/

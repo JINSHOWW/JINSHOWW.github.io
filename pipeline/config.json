@@ -1,0 +1,86 @@
+{
+  "channels": {
+    "A": {
+      "name": "괴담",
+      "voice": {
+        "engine": "voicevox",
+        "speaker": "青山龍星",
+        "style": "ノーマル",
+        "speed": 0.95,
+        "pitch": -0.02,
+        "intonation": 0.9,
+        "credit": "VOICEVOX:青山龍星"
+      },
+      "image_style": "dark sumi-e ink wash painting, monochrome with faint indigo, heavy shadows, rough paper texture, Joseon-era Korea, no text",
+      "placeholder_color": [
+        18,
+        20,
+        28
+      ],
+      "bed_default": "night",
+      "bed_gain_db": -24,
+      "sfx_gain_db": -12,
+      "scene_gap": 0.4,
+      "sub_font_ja": "Noto Serif CJK JP",
+      "sub_font_ko": "Noto Sans CJK KR",
+      "xfade": 0.5
+    },
+    "B": {
+      "name": "낭독",
+      "voice": {
+        "engine": "elevenlabs",
+        "voice_id": "",
+        "model_id": "eleven_multilingual_v2",
+        "speed": 0.9,
+        "stability": 0.65,
+        "similarity_boost": 0.75,
+        "credit": "Voice: ElevenLabs",
+        "fallback": {
+          "engine": "voicevox",
+          "speaker": "冥鳴ひまり",
+          "style": "ノーマル",
+          "speed": 0.88,
+          "pitch": -0.01,
+          "intonation": 0.8,
+          "credit": "VOICEVOX:冥鳴ひまり"
+        }
+      },
+      "image_style": "soft warm watercolor illustration, gentle lamplight, muted earthy palette, Joseon-era Korean village, calm and cozy, no text",
+      "placeholder_color": [
+        58,
+        44,
+        34
+      ],
+      "bed_default": "rain",
+      "bed_gain_db": -26,
+      "sfx_gain_db": -20,
+      "scene_gap": 1.2,
+      "sub_font_ja": "Noto Sans CJK JP",
+      "sub_font_ko": "Noto Sans CJK KR",
+      "xfade": 1.8
+    }
+  },
+  "video": {
+    "fps": 30,
+    "main": [
+      1920,
+      1080
+    ],
+    "short": [
+      1080,
+      1920
+    ],
+    "thumb": [
+      1280,
+      720
+    ],
+    "short_max_sec": 59
+  },
+  "audio": {
+    "sample_rate": 48000,
+    "target_lufs": -14.0,
+    "true_peak": -1.5,
+    "lra": 11
+  },
+  "_note": "bed_gain_db/sfx_gain_db: 낭독 음성(유성 구간 RMS) 대비 dB. xfade: 장면 전환 디졸브 초"
+}
