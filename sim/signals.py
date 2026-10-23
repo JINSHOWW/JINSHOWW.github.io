@@ -84,6 +84,8 @@ def crypto():
     line("보유하되 김프 ≥5% 매도, ≤2% 재매수", [stats(d, when(kimp, lambda v, h: False if v >= 0.05 else True if v <= 0.02 else h)) for d in data.values()], 100_000)
     line("역프(≤0%) 매수, 김프 ≥3% 매도", [stats(d, when(kimp, lambda v, h: True if v <= 0 else False if v >= 0.03 else h)) for d in data.values()], 100_000)
 
+    kimp_check(data, dates, kimp)
+
     head("[코인] 돌파+5일선필터에 정보 필터 더하기 (돌파는 목표가 주문)")
     calm = {t for t in dates if fng.get(t, 50) < 75}
     fear_ok = {t for t in dates if fng.get(t, 50) <= 50}
@@ -93,6 +95,27 @@ def crypto():
         line(name, [bt.breakout(d, 0.5, True, allow=allow) for d in data.values()], 100_000)
     fomc_off = set(dates) - set(FOMC)
     line("+ FOMC 발표일엔 쉬기", [bt.breakout(d, 0.5, True, allow=fomc_off) for d in data.values()], 100_000)
+
+
+def kimp_check(data, dates, kimp):
+    """김프 규칙이 우연인지: 기준값을 바꿔도, 기간을 나눠도, 코인마다도 좋은지 본다."""
+    rule = lambda lo, hi: when(kimp, lambda v, h: True if v <= lo else False if v >= hi else h)
+    always = lambda d, cl, i, held: True
+    split = len(dates) * 2 // 3
+    print(f"\n[김프 검증] 기준값 표: 칸 = 3년 수익률 (그냥 보유 "
+          f"{sum(stats(d, always)[0] for d in data.values()) / len(data) / bt.CASH - 1:+.0%})")
+    his = (0.02, 0.03, 0.04, 0.05)
+    print("  매수\\매도" + "".join(f"{f'≥{h:.0%}':>9}" for h in his))
+    for lo in (-0.01, 0.0, 0.005, 0.01):
+        print(f"  ≤{lo:+.1%}  " + "".join(
+            f"{sum(stats(d, rule(lo, hi))[0] for d in data.values()) / len(data) / bt.CASH - 1:>+9.0%}" for hi in his))
+    for name, a, b in (("앞 2년", 0, split), ("마지막 1년", split, len(dates))):
+        seg = {c: d[a:b] for c, d in data.items()}
+        r = sum(stats(d, rule(0, 0.03))[0] for d in seg.values()) / len(seg) / bt.CASH - 1
+        h = sum(stats(d, always)[0] for d in seg.values()) / len(seg) / bt.CASH - 1
+        print(f"  {name} ({dates[a]}~{dates[b - 1]}): 역프매수/김프3%매도 {r:+.0%}  vs 그냥 보유 {h:+.0%}")
+    print("  코인별: " + "  ".join(f"{c} {stats(d, rule(0, 0.03))[0] / bt.CASH - 1:+.0%}"
+                                   f"(보유 {stats(d, always)[0] / bt.CASH - 1:+.0%})" for c, d in data.items()))
 
 
 def stocks():
